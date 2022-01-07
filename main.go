@@ -43,6 +43,24 @@ type RpcReply struct {
 	} `xml:"data"`
 }
 
+type RpcReplyError struct {
+	XMLName   xml.Name `xml:"rpc-reply"`
+	Text      string   `xml:",chardata"`
+	Xmlns     string   `xml:"xmlns,attr"`
+	MessageID string   `xml:"message-id,attr"`
+	RpcError  struct {
+		Text          string `xml:",chardata"`
+		ErrorType     string `xml:"error-type"`
+		ErrorTag      string `xml:"error-tag"`
+		ErrorSeverity string `xml:"error-severity"`
+		ErrorMessage  struct {
+			Text string `xml:",chardata"`
+			Lang string `xml:"lang,attr"`
+		} `xml:"error-message"`
+		ErrorPath string `xml:"error-path"`
+	} `xml:"rpc-error"`
+}
+
 func (d device) EstablishConnection() *netconf.Driver {
 	conn, err := netconf.NewNetconfDriver(
 		d.ip,
@@ -89,7 +107,6 @@ func (d device) GetInterfaces() {
 	}
 	InterfaceData := output.Data.System.IntfItems.PhysItems.PhysIfList
 	sort.SliceStable(InterfaceData, func(i, j int) bool { return InterfaceData[i].ID < InterfaceData[j].ID })
-	fmt.Printf("%v\n", InterfaceData)
 
 	for _, v := range InterfaceData {
 		fmt.Printf("%v		VLAN: %v \n", v.ID, v.PhysItems.AccessVlan)
@@ -134,9 +151,46 @@ func (d device) GetInterface(port_id string) {
 	}
 }
 
+func (d device) UpdateVlan(p string, v string) {
+
+	changevlan := `
+	<config>
+	<System xmlns="http://cisco.com/ns/yang/cisco-nx-os-device">
+	<intf-items>
+	<phys-items>
+	<PhysIf-list>
+	<id>` + p + `</id>
+	<accessVlan>vlan-` + v + `</accessVlan>
+	</PhysIf-list>
+	</phys-items>
+	</intf-items>
+	</System>
+	</config>`
+
+	fmt.Println("Updating Access VLAN")
+	conn := d.EstablishConnection
+	res, err := conn().EditConfig("running", changevlan)
+	if err != nil {
+		fmt.Println("Error: ", err)
+	}
+	bs := []byte(res.Result)
+	var output RpcReplyError
+	xml.Unmarshal(bs, &output)
+	if len(output.RpcError.ErrorMessage.Text) > 0 {
+		fmt.Println("Unable to update VLAN, Error Message Below: ")
+		fmt.Println(output.RpcError.ErrorMessage.Text)
+	} else {
+		fmt.Println("Interface Updated!")
+
+		d.GetInterface(p)
+
+	}
+}
+
 func main() {
 	d1 := device{"192.168.137.101", "admin", "Pa55w0rd1!"}
 	d1.GetInterfaces()
-	d1.GetInterface("eth1/199")
+	d1.GetInterface("eth1/1671")
+	d1.UpdateVlan("eth1/17", "11")
 
 }
