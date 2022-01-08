@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/xml"
+	"flag"
 	"fmt"
 	"sort"
 
@@ -189,7 +190,24 @@ func (d device) UpdateVlan(p string, v string) {
 
 func main() {
 	d1 := device{"192.168.137.101", "admin", "Pa55w0rd1!"}
-	d1.GetInterfaces()
+	getVlansPtr := flag.Bool("list", false, "Use this flag to retrieve a list of vlan assignmens")
+	ipPtr := flag.String("ip", "", "The IP of the device")
+	usernamePtr := flag.String("username", "", "The IP of the device")
+	portPtr := flag.String("iface", "", "The IP of the device")
+	vlanPtr := flag.String("vlan", "", "The IP of the device")
+	flag.Parse()
+
+	fmt.Printf("%v", *getVlansPtr)
+	if *getVlansPtr {
+		d1.GetInterfaces()
+	}
+
+	fmt.Println("Your command line argumanet is: ", *ipPtr)
+	fmt.Println("Your command line argumanet is: ", *usernamePtr)
+	fmt.Println("Your command line argumanet is: ", *portPtr)
+	//
+	_ = vlanPtr
+
 	d1.GetInterface("eth1/1671")
 	d1.UpdateVlan("eth1/17", "11")
 
