@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"flag"
 	"fmt"
+	"os"
 	"sort"
 
 	"github.com/scrapli/scrapligo/driver/base"
@@ -78,6 +79,7 @@ func (d device) EstablishConnection() *netconf.Driver {
 }
 
 func (d device) GetInterfaces() {
+	defer d.EstablishConnection().Close()
 	InterfaceFilter := `<System xmlns="http://cisco.com/ns/yang/cisco-nx-os-device">
 	<intf-items>
 	<phys-items>
@@ -115,6 +117,7 @@ func (d device) GetInterfaces() {
 }
 
 func (d device) GetInterface(port_id string) {
+	defer d.EstablishConnection().Close()
 	InterfaceFilter := "" +
 		"<System xmlns=\"http://cisco.com/ns/yang/cisco-nx-os-device\">\n" +
 		"<intf-items>\n" +
@@ -153,7 +156,7 @@ func (d device) GetInterface(port_id string) {
 }
 
 func (d device) UpdateVlan(p string, v string) {
-
+	defer d.EstablishConnection().Close()
 	changevlan := `
 	<config>
 	<System xmlns="http://cisco.com/ns/yang/cisco-nx-os-device">
@@ -189,26 +192,42 @@ func (d device) UpdateVlan(p string, v string) {
 }
 
 func main() {
-	d1 := device{"192.168.137.101", "admin", "Pa55w0rd1!"}
-	getVlansPtr := flag.Bool("list", false, "Use this flag to retrieve a list of vlan assignmens")
-	ipPtr := flag.String("ip", "", "The IP of the device")
-	usernamePtr := flag.String("username", "", "The IP of the device")
-	portPtr := flag.String("iface", "", "The IP of the device")
-	vlanPtr := flag.String("vlan", "", "The IP of the device")
+	getVlansPtr := flag.Bool("get-iface-vlans", false, "Shows the current interface to vlan mappings")
+	getIfacePtr := flag.Bool("get-iface", false, "Shows a specific interface")
+	updateVlanptr := flag.Bool("update-iface-vlan", false, "Assign a new VLAN ID to a specified interface")
+	ipPtr := flag.String("ip", "", "Target IP")
+	usernamePtr := flag.String("username", "", "Device username")
+	portPtr := flag.String("iface", "", "Target Interface")
+	vlanPtr := flag.String("vlan", "", "VLAN identifyer")
 	flag.Parse()
+	//if username of ip are not specified the exit the program
 
-	fmt.Printf("%v", *getVlansPtr)
+	if len(*usernamePtr) == 0 {
+		fmt.Println("No username specified, Please specify -username")
+		os.Exit(1)
+	} else if len(*ipPtr) == 0 {
+		fmt.Println("No target specifed, Please specify -ip")
+		os.Exit(1)
+	}
+
+	d1 := device{*ipPtr, *usernamePtr, "Pa55w0rd1!"}
+
 	if *getVlansPtr {
 		d1.GetInterfaces()
 	}
 
-	fmt.Println("Your command line argumanet is: ", *ipPtr)
-	fmt.Println("Your command line argumanet is: ", *usernamePtr)
-	fmt.Println("Your command line argumanet is: ", *portPtr)
-	//
-	_ = vlanPtr
+	if *getIfacePtr {
+		d1.GetInterface(*portPtr)
+	}
 
-	d1.GetInterface("eth1/1671")
-	d1.UpdateVlan("eth1/17", "11")
-
+	if *updateVlanptr {
+		if len(*portPtr) == 0 {
+			fmt.Println("Error: Wanted to Update Port But No Port Specified, Use -iface")
+			os.Exit(1)
+		} else if len(*vlanPtr) == 0 {
+			fmt.Println("Error: Wanted to Update Port But No VLAN Specified, Use -vlan")
+			os.Exit(1)
+		}
+		d1.UpdateVlan(*portPtr, *vlanPtr)
+	}
 }
